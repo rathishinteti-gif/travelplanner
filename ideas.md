@@ -2,7 +2,7 @@
 
 ## Three stylistic approaches
 
-### Theme Name: Sunlit Atlas
+### Theme Name: Routebook
 A warm editorial travel workspace inspired by field journals, ferry tickets, and sun-washed map paper. It feels optimistic and practical, with a tactile planning rhythm rather than a generic dashboard.
 
 **Probability:** 0.07
@@ -17,7 +17,7 @@ A dark, cinematic trip-planning cockpit with electric route highlights and subtl
 
 **Probability:** 0.05
 
-## Chosen direction: Sunlit Atlas
+## Chosen direction: Routebook
 
 ### Design Movement
 Contemporary editorial travel design: the material warmth of a field notebook fused with the information clarity of a modern map interface.
@@ -54,7 +54,7 @@ A thoughtful trip-planning workspace for people who want the journey to feel as 
 ### Brand Voice
 Headlines sound like a capable travel companion: specific, warm, and lightly poetic. CTAs are active but never salesy. Microcopy should reduce uncertainty and invite the next useful step.
 
-Example headline: “Make room for the good detours.”
+Example headline: “Plan the days you’ll remember.”
 
 Example CTA: “Sketch a new route.”
 

@@ -1,6 +1,6 @@
-# Sunlit Atlas / Travel Planner
+# Routebook / Travel Planner
 
-Sunlit Atlas is a React + TypeScript starter web app for planning trips with a calmer, more editorial feel. The first release is a frontend-only workspace with a trip overview, route cards, destination inspiration, and clearly labeled placeholder actions for features that will be wired up later.
+Routebook is a React + TypeScript starter web app for planning trips with a calmer, more editorial feel. The first release is a frontend-only workspace with a trip overview, route cards, destination inspiration, and clearly labeled placeholder actions for features that will be wired up later.
 
 ## Stack
 

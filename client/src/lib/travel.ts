@@ -1,6 +1,6 @@
 /*
- * Sunlit Atlas design philosophy: typed trip data stays as calm and durable as the paper-based
- * planning metaphor, with serializable dates and stable IDs ready for a future backend.
+ * Travel planner design philosophy: typed trip data stays calm and durable, with serializable
+ * dates, locally stored cover images, and stable IDs ready for a future backend.
  */
 export type TripStatus = "planning" | "idea" | "ready";
 
@@ -10,6 +10,7 @@ export type SavedPlace = {
   lat: number;
   lng: number;
   address?: string;
+  providerId?: string;
 };
 
 export type Activity = {
@@ -31,13 +32,15 @@ export type Trip = {
   destination: string;
   startDate: string;
   endDate: string;
+  description?: string;
+  coverImage?: string;
   status: TripStatus;
   pinnedPlaces: SavedPlace[];
   itinerary: ItineraryDay[];
 };
 
-export const TRIPS_STORAGE_KEY = "sunlit-atlas:v1:trips";
-export const PLACES_STORAGE_KEY = "sunlit-atlas:v1:places";
+export const TRIPS_STORAGE_KEY = "travel-planner:v2:trips";
+export const PLACES_STORAGE_KEY = "travel-planner:v2:places";
 
 export const tripDays = (startDate: string, endDate: string) => {
   const start = new Date(`${startDate}T00:00:00`);
@@ -64,7 +67,7 @@ export function writeStorage<T>(key: string, value: T) {
   }
 }
 
-export function createTrip(destination: string, startDate: string, endDate: string): Trip {
+export function createTrip(destination: string, startDate: string, endDate: string, description = "", coverImage = ""): Trip {
   const id = typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now()}-${destination}`;
   const days = tripDays(startDate, endDate);
   const itinerary = Array.from({ length: days }, (_, index) => {
@@ -73,11 +76,11 @@ export function createTrip(destination: string, startDate: string, endDate: stri
     return {
       id: `${id}-day-${index + 1}`,
       date: date.toISOString().slice(0, 10),
-      activities: index === 0 ? [{ id: `${id}-activity-1`, title: "Arrival and settle in", time: "15:00", location: destination }] : [],
+      activities: index === 0 ? [{ id: `${id}-activity-1`, title: "Arrival and settle in", time: "15:00", location: destination, notes: "" }] : [],
     } satisfies ItineraryDay;
   });
 
-  return { id, destination, startDate, endDate, status: "planning", pinnedPlaces: [], itinerary };
+  return { id, destination, startDate, endDate, description, coverImage, status: "planning", pinnedPlaces: [], itinerary };
 }
 
 export const formatShortDate = (date: string) =>

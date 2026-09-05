@@ -1,5 +1,5 @@
 /*
- * Sunlit Atlas design philosophy: editorial travel planning that feels like a field journal,
+ * Travel planner design philosophy: editorial travel planning that feels like a field journal,
  * balancing human warmth with clear route structure and a coral wayfinding accent.
  */
 import { useEffect, useState } from "react";
@@ -28,7 +28,7 @@ import type { LucideIcon } from "lucide-react";
 import { ItineraryBuilder } from "@/components/ItineraryBuilder";
 import { MapExplorer } from "@/components/MapExplorer";
 import { TripCreateDialog } from "@/components/TripCreateDialog";
-import { readStorage, tripDays, TRIPS_STORAGE_KEY, writeStorage, type Trip } from "@/lib/travel";
+import { formatShortDate, readStorage, tripDays, TRIPS_STORAGE_KEY, writeStorage, type Trip } from "@/lib/travel";
 
 const HERO_IMAGE = "/manus-storage/travelplanner-hero_c5784f74.jpg";
 const LOGO_IMAGE = "/manus-storage/travelplanner-logo_03977460.png";
@@ -57,6 +57,7 @@ const demoTrips = [
     image: LISBON_IMAGE,
     accent: "coral",
     progress: "68% planned",
+    description: "Light, tiled streets, long lunches.",
     tripId: undefined,
   },
   {
@@ -67,6 +68,7 @@ const demoTrips = [
     image: KYOTO_IMAGE,
     accent: "sage",
     progress: "3 places saved",
+    description: "Quiet lanes and old wood.",
     tripId: undefined,
   },
 ];
@@ -90,12 +92,13 @@ export default function Home() {
   const activeTrip = savedTrips.find((trip) => trip.id === activeTripId) ?? null;
   const trips = savedTrips.length > 0 ? savedTrips.map((trip) => ({
     city: trip.destination,
-    dates: `${trip.startDate} – ${trip.endDate}`,
+    dates: `${formatShortDate(trip.startDate)} – ${formatShortDate(trip.endDate)}`,
     days: `${tripDays(trip.startDate, trip.endDate)} days`,
     status: trip.status === "planning" ? "Planning" : trip.status === "ready" ? "Ready" : "Idea",
-    image: trip.destination.toLowerCase().includes("kyoto") ? KYOTO_IMAGE : LISBON_IMAGE,
+    image: trip.coverImage || (trip.destination.toLowerCase().includes("kyoto") ? KYOTO_IMAGE : LISBON_IMAGE),
     accent: trip.status === "planning" ? "coral" : "sage",
     progress: `${trip.itinerary.reduce((sum, day) => sum + day.activities.length, 0)} activities`,
+    description: trip.description || "A new route taking shape.",
     tripId: trip.id,
   })) : demoTrips;
 
@@ -106,10 +109,10 @@ export default function Home() {
           <div className="flex items-center gap-3">
             <span className="hidden text-[9px] font-bold uppercase tracking-[0.18em] text-[#E56B52] sm:block">Est. / 2025</span>
             <div className="flex h-10 w-10 items-center justify-center rounded-[12px] bg-[#E56B52] p-2 shadow-[0_8px_20px_rgba(229,107,82,0.2)]">
-              <img src={LOGO_IMAGE} alt="Sunlit Atlas compass mark" className="h-full w-full object-contain" />
+              <img src={LOGO_IMAGE} alt="Travel planner compass mark" className="h-full w-full object-contain" />
             </div>
             <div>
-              <p className="font-display text-[18px] leading-none text-[#1F2A35]">Sunlit Atlas</p>
+              <p className="font-display text-[18px] leading-none text-[#1F2A35]">Routebook</p>
               <p className="mt-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-[#7D817D]">Travel planner</p>
             </div>
           </div>
@@ -163,7 +166,7 @@ export default function Home() {
           <header className="flex items-center justify-between border-b border-[#E2DCD2] px-5 py-5 sm:px-8 lg:px-12">
             <div className="flex items-center gap-3 lg:hidden">
               <div className="flex h-9 w-9 items-center justify-center rounded-[10px] bg-[#E56B52] p-2"><img src={LOGO_IMAGE} alt="" className="h-full w-full object-contain" /></div>
-              <span className="font-display text-[18px]">Sunlit Atlas</span>
+              <span className="font-display text-[18px]">Routebook</span>
             </div>
             <div className="relative hidden max-w-[340px] flex-1 md:block">
               <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#9A9B94]" />
@@ -171,7 +174,7 @@ export default function Home() {
             </div>
             <div className="ml-auto flex items-center gap-4">
               <button type="button" onClick={() => notifyComingSoon("Notifications")} aria-label="Notifications" className="relative text-[#7A807D] transition hover:text-[#E56B52]"><Ticket size={18} /><span className="absolute -right-1 -top-1 h-1.5 w-1.5 rounded-full bg-[#E56B52]" /></button>
-              <div className="flex items-center gap-2 border-l border-[#DFD9CF] pl-4"><div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#D6E0D4] text-[11px] font-bold text-[#55665A]">AR</div><span className="hidden text-[12px] font-semibold text-[#65706D] sm:block">Alex Rivera</span></div>
+              <div className="flex items-center gap-2 border-l border-[#DFD9CF] pl-4"><div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#D6E0D4] text-[11px] font-bold text-[#55665A]">AR</div><span className="hidden text-[12px] font-semibold text-[#65706D] sm:block">My trips</span></div>
             </div>
           </header>
 
@@ -179,8 +182,8 @@ export default function Home() {
             <section className="grid gap-8 xl:grid-cols-[minmax(0,0.95fr)_minmax(400px,1.05fr)] xl:items-end">
               <div className="max-w-[580px] pb-3">
                 <p className="mb-5 flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.22em] text-[#E56B52]"><span className="h-px w-7 bg-[#E56B52]" />Tuesday, 08 April</p>
-                <h1 className="font-display text-[clamp(48px,5.7vw,78px)] leading-[0.9] tracking-[-0.045em] text-[#22303A]">Make room for<br /><em className="font-display text-[#E56B52]">good detours.</em></h1>
-                <p className="mt-7 max-w-[410px] text-[15px] leading-7 text-[#737976]">Your next adventure is a few thoughtful choices away. Keep the route loose, the essentials close, and the best parts open.</p>
+                <h1 className="font-display text-[clamp(48px,5.7vw,78px)] leading-[0.9] tracking-[-0.045em] text-[#22303A]">Plan the days<br /><em className="font-display text-[#E56B52]">you’ll remember.</em></h1>
+                <p className="mt-7 max-w-[410px] text-[15px] leading-7 text-[#737976]">Keep the essentials close, shape each day with intention, and leave a little room for the unexpected.</p>
                 <button type="button" onClick={() => setTripDialogOpen(true)} className="mt-8 inline-flex items-center gap-3 rounded-full bg-[#E56B52] px-5 py-3.5 text-[13px] font-bold text-white shadow-[0_9px_22px_rgba(229,107,82,0.24)] transition duration-200 hover:-translate-y-0.5 hover:bg-[#D95D45] active:scale-[0.97]"><Plus size={17} /> Sketch a new route</button>
               </div>
               <div className="relative overflow-hidden rounded-[24px] bg-[#263C45] shadow-[0_18px_40px_rgba(48,55,53,0.13)]">
@@ -198,7 +201,7 @@ export default function Home() {
               <div className="grid gap-5 lg:grid-cols-2">
                 {trips.map((trip) => (
                   <article key={trip.tripId ?? trip.city} onClick={() => trip.tripId && setActiveTripId(trip.tripId)} className="group relative overflow-hidden rounded-[18px] border border-[#E2DCD2] bg-[#FBF8F2] transition duration-200 hover:-translate-y-1 hover:shadow-[0_14px_28px_rgba(48,55,53,0.08)]">
-                    <div className="relative flex gap-4 p-4"><span className="absolute left-4 top-4 z-10 flex h-7 w-7 items-center justify-center rounded-full border border-white/60 bg-[#E56B52] text-white shadow-sm"><Compass size={12} /></span><img src={trip.image} alt={trip.city} className="h-[118px] w-[124px] shrink-0 rounded-[12px] object-cover" /><div className="min-w-0 flex-1"><div className="flex items-start justify-between gap-2"><span className={`rounded-full px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.14em] ${trip.accent === "coral" ? "bg-[#F7DDD4] text-[#BB5D49]" : "bg-[#DCE5D8] text-[#627663]"}`}>{trip.status}</span><button type="button" onClick={() => notifyComingSoon(`${trip.city} options`)} aria-label={`Options for ${trip.city}`} className="text-[#A6A59E] transition hover:text-[#26343B]"><Ellipsis size={17} /></button></div><h3 className="mt-3 truncate font-display text-[21px] text-[#2A3840]">{trip.city}</h3><p className="mt-1 text-[11px] font-semibold text-[#8A8E89]">{trip.dates}</p><div className="mt-4 flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.12em] text-[#A0A29A]"><CalendarDays size={13} /> {trip.days}<span className="h-1 w-1 rounded-full bg-[#CBC6BC]" /> {trip.progress}</div></div></div>
+                    <div className="relative flex gap-4 p-4"><span className="absolute left-4 top-4 z-10 flex h-7 w-7 items-center justify-center rounded-full border border-white/60 bg-[#E56B52] text-white shadow-sm"><Compass size={12} /></span><img src={trip.image} alt={trip.city} className="h-[118px] w-[124px] shrink-0 rounded-[12px] object-cover" /><div className="min-w-0 flex-1"><div className="flex items-start justify-between gap-2"><span className={`rounded-full px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.14em] ${trip.accent === "coral" ? "bg-[#F7DDD4] text-[#BB5D49]" : "bg-[#DCE5D8] text-[#627663]"}`}>{trip.status}</span><button type="button" onClick={() => notifyComingSoon(`${trip.city} options`)} aria-label={`Options for ${trip.city}`} className="text-[#A6A59E] transition hover:text-[#26343B]"><Ellipsis size={17} /></button></div><h3 className="mt-3 truncate font-display text-[21px] text-[#2A3840]">{trip.city}</h3><p className="mt-1 text-[11px] font-semibold text-[#8A8E89]">{trip.dates}</p><p className="mt-2 line-clamp-1 text-[11px] text-[#969990]">{trip.description}</p><div className="mt-4 flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.12em] text-[#A0A29A]"><CalendarDays size={13} /> {trip.days}<span className="h-1 w-1 rounded-full bg-[#CBC6BC]" /> {trip.progress}</div></div></div>
                     <div className="flex items-center justify-between border-t border-[#EDE7DD] px-4 py-3"><div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.13em] text-[#8D928B]"><MapPin size={13} className="text-[#E56B52]" /> Route ready</div><button type="button" onClick={() => notifyComingSoon(`${trip.city} itinerary`)} className="text-[11px] font-bold text-[#26343B] transition group-hover:text-[#E56B52]">Open itinerary <ArrowUpRight size={13} className="ml-1 inline" /></button></div>
                   </article>
                 ))}
@@ -223,7 +226,7 @@ export default function Home() {
               <ItineraryBuilder trip={activeTrip} onTripChange={(nextTrip) => { const next = savedTrips.map((trip) => trip.id === nextTrip.id ? nextTrip : trip); setSavedTrips(next); writeStorage(TRIPS_STORAGE_KEY, next); }} />
             </section>
 
-            <footer className="mt-14 flex flex-col gap-3 border-t border-[#E2DCD2] pt-5 text-[10px] font-semibold uppercase tracking-[0.15em] text-[#A0A29A] sm:flex-row sm:items-center sm:justify-between"><p>Sunlit Atlas / A calmer way to go</p><p className="flex items-center gap-2"><Map size={13} /> Frontend starter workspace <span className="text-[#E56B52]">●</span></p></footer>
+            <footer className="mt-14 flex flex-col gap-3 border-t border-[#E2DCD2] pt-5 text-[10px] font-semibold uppercase tracking-[0.15em] text-[#A0A29A] sm:flex-row sm:items-center sm:justify-between"><p>Routebook / A calmer way to go</p><p className="flex items-center gap-2"><Map size={13} /> Frontend starter workspace <span className="text-[#E56B52]">●</span></p></footer>
           </div>
         </main>
         <TripCreateDialog open={tripDialogOpen} onOpenChange={setTripDialogOpen} onCreated={(trip) => { const next = [trip, ...savedTrips]; setSavedTrips(next); setActiveTripId(trip.id); writeStorage(TRIPS_STORAGE_KEY, next); }} />

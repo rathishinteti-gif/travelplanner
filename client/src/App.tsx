@@ -1,5 +1,5 @@
 /*
- * Sunlit Atlas design philosophy: a warm editorial travel workspace with parchment surfaces,
+ * Travel planner design philosophy: a warm editorial travel workspace with parchment surfaces,
  * ink-navy structure, canyon-coral wayfinding, and useful asymmetry.
  */
 import { Toaster } from "@/components/ui/sonner";

@@ -1,64 +1,48 @@
 /*
- * Sunlit Atlas design philosophy: itineraries read like annotated day cards, with tactile ordering
- * cues, stamped metadata, and direct controls that keep the route easy to reshape.
+ * Travel planner design philosophy: itineraries read like annotated day cards, with tactile ordering
+ * cues, editable details, and direct controls that keep each day easy to reshape.
  */
 import { useMemo, useState } from "react";
-import { ArrowDown, ArrowUp, CalendarDays, GripVertical, MapPin, Plus, Sparkles } from "lucide-react";
+import { ArrowDown, ArrowUp, CalendarDays, GripVertical, MapPin, Plus, Save, Sparkles, X } from "lucide-react";
 import { toast } from "sonner";
 import type { Activity, ItineraryDay, Trip } from "@/lib/travel";
 
-type ItineraryBuilderProps = {
-  trip: Trip | null;
-  onTripChange: (trip: Trip) => void;
-};
+type ItineraryBuilderProps = { trip: Trip | null; onTripChange: (trip: Trip) => void };
 
 export function ItineraryBuilder({ trip, onTripChange }: ItineraryBuilderProps) {
   const [activeDayId, setActiveDayId] = useState<string | null>(trip?.itinerary[0]?.id ?? null);
   const [draggedId, setDraggedId] = useState<string | null>(null);
+  const [adding, setAdding] = useState(false);
+  const [draft, setDraft] = useState({ title: "", time: "10:00", location: "", notes: "" });
 
   const activeDay = useMemo(() => trip?.itinerary.find((day) => day.id === activeDayId) ?? trip?.itinerary[0] ?? null, [activeDayId, trip]);
+  if (!trip || !activeDay) return <section className="rounded-[20px] border border-dashed border-[#D4CCC0] bg-[#F7F2EA] p-8 text-center"><span className="mx-auto flex h-11 w-11 items-center justify-center rounded-full border border-[#E1B9AD] text-[#E56B52]"><CalendarDays size={18} /></span><h3 className="mt-4 font-display text-[25px] text-[#2D3B42]">Your itinerary is waiting for a route.</h3><p className="mx-auto mt-2 max-w-[320px] text-[12px] leading-5 text-[#92968F]">Create a trip above, then shape each day with stops, meals, and the small moments worth remembering.</p></section>;
 
-  if (!trip || !activeDay) {
-    return <section className="rounded-[20px] border border-dashed border-[#D4CCC0] bg-[#F7F2EA] p-8 text-center"><span className="mx-auto flex h-11 w-11 items-center justify-center rounded-full border border-[#E1B9AD] text-[#E56B52]"><CalendarDays size={18} /></span><h3 className="mt-4 font-display text-[25px] text-[#2D3B42]">Your itinerary is waiting for a route.</h3><p className="mx-auto mt-2 max-w-[320px] text-[12px] leading-5 text-[#92968F]">Create a trip above, then shape each day with stops, meals, and the small moments worth remembering.</p></section>;
-  }
-
-  const updateDay = (updater: (day: ItineraryDay) => ItineraryDay) => {
-    const nextItinerary = trip.itinerary.map((day) => (day.id === activeDay.id ? updater(day) : day));
-    onTripChange({ ...trip, itinerary: nextItinerary });
-  };
-
+  const updateDay = (updater: (day: ItineraryDay) => ItineraryDay) => onTripChange({ ...trip, itinerary: trip.itinerary.map((day) => day.id === activeDay.id ? updater(day) : day) });
+  const updateActivity = (activityId: string, patch: Partial<Activity>) => updateDay((day) => ({ ...day, activities: day.activities.map((activity) => activity.id === activityId ? { ...activity, ...patch } : activity) }));
   const reorder = (fromId: string, toIndex: number) => {
     const currentIndex = activeDay.activities.findIndex((activity) => activity.id === fromId);
     if (currentIndex < 0 || currentIndex === toIndex) return;
-    updateDay((day) => {
-      const activities = [...day.activities];
-      const [moved] = activities.splice(currentIndex, 1);
-      activities.splice(toIndex, 0, moved);
-      return { ...day, activities };
-    });
+    updateDay((day) => { const activities = [...day.activities]; const [moved] = activities.splice(currentIndex, 1); activities.splice(toIndex, 0, moved); return { ...day, activities }; });
     setDraggedId(null);
   };
-
-  const addActivity = () => {
-    const activity: Activity = { id: `${Date.now()}-activity`, title: "A new place to explore", time: "10:00", location: trip.destination };
+  const move = (index: number, direction: -1 | 1) => { const destination = index + direction; if (destination >= 0 && destination < activeDay.activities.length) reorder(activeDay.activities[index].id, destination); };
+  const addActivity = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!draft.title.trim()) return;
+    const activity: Activity = { id: `${Date.now()}-activity`, title: draft.title.trim(), time: draft.time, location: draft.location.trim() || trip.destination, notes: draft.notes.trim() };
     updateDay((day) => ({ ...day, activities: [...day.activities, activity] }));
-    toast("Blank activity added", { description: "Edit the title when your next idea arrives." });
+    setDraft({ title: "", time: "10:00", location: "", notes: "" }); setAdding(false);
+    toast("Activity added", { description: `Added to day ${trip.itinerary.findIndex((day) => day.id === activeDay.id) + 1}.` });
   };
 
-  const move = (index: number, direction: -1 | 1) => {
-    const destination = index + direction;
-    if (destination < 0 || destination >= activeDay.activities.length) return;
-    reorder(activeDay.activities[index].id, destination);
-  };
-
-  return (
-    <section className="overflow-hidden rounded-[20px] border border-[#DCD4C7] bg-[#FBF8F2] shadow-[0_14px_36px_rgba(48,55,53,0.06)]">
-      <div className="flex flex-col gap-4 border-b border-[#E5DED3] px-5 py-5 sm:flex-row sm:items-end sm:justify-between sm:px-6"><div><p className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.2em] text-[#E56B52]"><Sparkles size={14} /> Route notes</p><h3 className="mt-2 font-display text-[30px] leading-none tracking-[-0.03em] text-[#293840]">Shape the day.</h3><p className="mt-2 text-[12px] text-[#8C918B]">{trip.destination} / Drag stops into the order that feels right.</p></div><button type="button" onClick={addActivity} className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-[#E2B8AC] bg-[#FCEBE6] px-4 text-[11px] font-bold text-[#B75A47] transition hover:bg-[#F8DDD5] active:scale-[0.97]"><Plus size={15} /> Add activity</button></div>
-      <div className="border-b border-[#E5DED3] bg-[#F4EFE6] px-5 py-3 sm:px-6"><div className="flex gap-2 overflow-x-auto">{trip.itinerary.map((day, index) => <button type="button" key={day.id} onClick={() => setActiveDayId(day.id)} className={`shrink-0 rounded-[9px] px-3 py-2 text-left transition ${day.id === activeDay.id ? "bg-[#293840] text-white" : "text-[#7D847E] hover:bg-[#E9E2D8]"}`}><span className="block text-[9px] font-bold uppercase tracking-[0.15em] opacity-65">Day {index + 1}</span><span className="mt-1 block text-[11px] font-bold">{new Intl.DateTimeFormat("en", { month: "short", day: "numeric" }).format(new Date(`${day.date}T00:00:00`))}</span></button>)}</div></div>
-      <div className="space-y-3 p-5 sm:p-6">
-        {activeDay.activities.length === 0 && <div className="rounded-[12px] border border-dashed border-[#D5CEC2] px-4 py-7 text-center"><p className="font-display text-[22px] text-[#43514F]">An open page.</p><p className="mt-1 text-[11px] text-[#9A9E97]">Add your first stop, then move it into place.</p></div>}
-        {activeDay.activities.map((activity, index) => <article key={activity.id} draggable onDragStart={(event) => { setDraggedId(activity.id); event.dataTransfer.effectAllowed = "move"; event.dataTransfer.setData("text/plain", activity.id); }} onDragOver={(event) => event.preventDefault()} onDrop={(event) => { event.preventDefault(); const sourceId = event.dataTransfer.getData("text/plain") || draggedId; if (sourceId) reorder(sourceId, index); }} className={`group flex items-center gap-3 rounded-[12px] border bg-[#F8F3EB] px-3 py-3 transition ${draggedId === activity.id ? "border-[#E56B52] opacity-60" : "border-[#E4DDD2] hover:border-[#CFC6B8]"}`}><button type="button" aria-label={`Drag ${activity.title}`} className="cursor-grab touch-none text-[#B3B1A7] active:cursor-grabbing"><GripVertical size={17} /></button><span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#EAE2D6] text-[10px] font-bold text-[#7F877F]">{String(index + 1).padStart(2, "0")}</span><div className="min-w-0 flex-1"><p className="truncate text-[13px] font-bold text-[#34434A]">{activity.title}</p><p className="mt-1 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.1em] text-[#9A9D95]"><span>{activity.time}</span><span className="h-1 w-1 rounded-full bg-[#C8C1B5]" /><MapPin size={11} /> {activity.location}</p></div><div className="flex items-center gap-1 opacity-70 transition group-hover:opacity-100"><button type="button" onClick={() => move(index, -1)} disabled={index === 0} aria-label={`Move ${activity.title} up`} className="flex h-7 w-7 items-center justify-center rounded-full text-[#7D877F] hover:bg-[#E9E0D5] disabled:opacity-25"><ArrowUp size={13} /></button><button type="button" onClick={() => move(index, 1)} disabled={index === activeDay.activities.length - 1} aria-label={`Move ${activity.title} down`} className="flex h-7 w-7 items-center justify-center rounded-full text-[#7D877F] hover:bg-[#E9E0D5] disabled:opacity-25"><ArrowDown size={13} /></button></div></article>)}
-      </div>
-    </section>
-  );
+  return <section className="overflow-hidden rounded-[20px] border border-[#DCD4C7] bg-[#FBF8F2] shadow-[0_14px_36px_rgba(48,55,53,0.06)]">
+    <div className="flex flex-col gap-4 border-b border-[#E5DED3] px-5 py-5 sm:flex-row sm:items-end sm:justify-between sm:px-6"><div><p className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.2em] text-[#E56B52]"><Sparkles size={14} /> Daily rhythm</p><h3 className="mt-2 font-display text-[30px] leading-none tracking-[-0.03em] text-[#293840]">Shape the day.</h3><p className="mt-2 text-[12px] text-[#8C918B]">{trip.destination} / Edit, add, or reorder the stops.</p></div><button type="button" onClick={() => setAdding((value) => !value)} className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-[#E2B8AC] bg-[#FCEBE6] px-4 text-[11px] font-bold text-[#B75A47] transition hover:bg-[#F8DDD5] active:scale-[0.97]">{adding ? <X size={15} /> : <Plus size={15} />} {adding ? "Close form" : "Add activity"}</button></div>
+    <div className="border-b border-[#E5DED3] bg-[#F4EFE6] px-5 py-3 sm:px-6"><div className="flex gap-2 overflow-x-auto">{trip.itinerary.map((day, index) => <button type="button" key={day.id} onClick={() => { setActiveDayId(day.id); setAdding(false); }} className={`shrink-0 rounded-[9px] px-3 py-2 text-left transition ${day.id === activeDay.id ? "bg-[#293840] text-white" : "text-[#7D847E] hover:bg-[#E9E2D8]"}`}><span className="block text-[9px] font-bold uppercase tracking-[0.15em] opacity-65">Day {index + 1}</span><span className="mt-1 block text-[11px] font-bold">{new Intl.DateTimeFormat("en", { month: "short", day: "numeric" }).format(new Date(`${day.date}T00:00:00`))}</span></button>)}</div></div>
+    <div className="space-y-3 p-5 sm:p-6">
+      {adding && <form onSubmit={addActivity} className="rounded-[12px] border border-[#E5B9AD] bg-[#FCEBE6] p-4"><div className="grid gap-3 sm:grid-cols-[1fr_110px]"><label className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#9B5C4C]">Activity<input required autoFocus value={draft.title} onChange={(event) => setDraft({ ...draft, title: event.target.value })} placeholder="Sunrise at the viewpoint" className="mt-1 h-10 w-full rounded-[8px] border border-[#E8C6BC] bg-[#FFF9F5] px-3 text-[12px] font-semibold normal-case tracking-normal text-[#34434A] outline-none focus:border-[#E56B52]" /></label><label className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#9B5C4C]">Time<input type="time" value={draft.time} onChange={(event) => setDraft({ ...draft, time: event.target.value })} className="mt-1 h-10 w-full rounded-[8px] border border-[#E8C6BC] bg-[#FFF9F5] px-3 text-[12px] font-semibold normal-case tracking-normal text-[#34434A] outline-none focus:border-[#E56B52]" /></label></div><div className="mt-3 grid gap-3 sm:grid-cols-2"><label className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#9B5C4C]">Location<input value={draft.location} onChange={(event) => setDraft({ ...draft, location: event.target.value })} placeholder={trip.destination} className="mt-1 h-10 w-full rounded-[8px] border border-[#E8C6BC] bg-[#FFF9F5] px-3 text-[12px] font-semibold normal-case tracking-normal text-[#34434A] outline-none focus:border-[#E56B52]" /></label><label className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#9B5C4C]">Notes<input value={draft.notes} onChange={(event) => setDraft({ ...draft, notes: event.target.value })} placeholder="Book ahead if needed" className="mt-1 h-10 w-full rounded-[8px] border border-[#E8C6BC] bg-[#FFF9F5] px-3 text-[12px] font-semibold normal-case tracking-normal text-[#34434A] outline-none focus:border-[#E56B52]" /></label></div><button type="submit" className="mt-4 inline-flex h-9 items-center gap-2 rounded-full bg-[#E56B52] px-4 text-[11px] font-bold text-white transition hover:bg-[#D85D46] active:scale-[0.97]"><Save size={14} /> Save activity</button></form>}
+      {activeDay.activities.length === 0 && !adding && <div className="rounded-[12px] border border-dashed border-[#D5CEC2] px-4 py-7 text-center"><p className="font-display text-[22px] text-[#43514F]">An open page.</p><p className="mt-1 text-[11px] text-[#9A9E97]">Add your first stop, then move it into place.</p></div>}
+      {activeDay.activities.map((activity, index) => <article key={activity.id} draggable onDragStart={(event) => { setDraggedId(activity.id); event.dataTransfer.effectAllowed = "move"; event.dataTransfer.setData("text/plain", activity.id); }} onDragOver={(event) => event.preventDefault()} onDrop={(event) => { event.preventDefault(); const sourceId = event.dataTransfer.getData("text/plain") || draggedId; if (sourceId) reorder(sourceId, index); }} className={`group rounded-[12px] border bg-[#F8F3EB] p-3 transition ${draggedId === activity.id ? "border-[#E56B52] opacity-60" : "border-[#E4DDD2] hover:border-[#CFC6B8]"}`}><div className="flex items-start gap-3"><button type="button" aria-label={`Drag ${activity.title}`} className="mt-2 cursor-grab touch-none text-[#B3B1A7] active:cursor-grabbing"><GripVertical size={17} /></button><span className="mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#EAE2D6] text-[10px] font-bold text-[#7F877F]">{String(index + 1).padStart(2, "0")}</span><div className="grid min-w-0 flex-1 gap-2 sm:grid-cols-[1fr_92px]"><label className="sr-only" htmlFor={`activity-title-${activity.id}`}>Activity title</label><input id={`activity-title-${activity.id}`} value={activity.title} onChange={(event) => updateActivity(activity.id, { title: event.target.value })} className="h-8 min-w-0 rounded-[7px] border border-transparent bg-transparent px-2 text-[13px] font-bold text-[#34434A] outline-none transition hover:border-[#DED4C6] focus:border-[#E56B52] focus:bg-[#FFF9F5]" /><label className="sr-only" htmlFor={`activity-time-${activity.id}`}>Activity time</label><input id={`activity-time-${activity.id}`} type="time" value={activity.time ?? ""} onChange={(event) => updateActivity(activity.id, { time: event.target.value })} className="h-8 rounded-[7px] border border-transparent bg-transparent px-2 text-[11px] font-bold text-[#7C847D] outline-none transition hover:border-[#DED4C6] focus:border-[#E56B52] focus:bg-[#FFF9F5]" /></div><div className="flex items-center gap-1 opacity-70 transition group-hover:opacity-100"><button type="button" onClick={() => move(index, -1)} disabled={index === 0} aria-label={`Move ${activity.title} up`} className="flex h-7 w-7 items-center justify-center rounded-full text-[#7D877F] hover:bg-[#E9E0D5] disabled:opacity-25"><ArrowUp size={13} /></button><button type="button" onClick={() => move(index, 1)} disabled={index === activeDay.activities.length - 1} aria-label={`Move ${activity.title} down`} className="flex h-7 w-7 items-center justify-center rounded-full text-[#7D877F] hover:bg-[#E9E0D5] disabled:opacity-25"><ArrowDown size={13} /></button></div></div><div className="mt-2 grid gap-2 pl-[4.4rem] sm:grid-cols-2"><label className="relative"><MapPin size={12} className="absolute left-2 top-2.5 text-[#E56B52]" /><span className="sr-only">Location</span><input value={activity.location ?? ""} onChange={(event) => updateActivity(activity.id, { location: event.target.value })} placeholder={trip.destination} className="h-8 w-full rounded-[7px] border border-transparent bg-transparent pl-7 pr-2 text-[10px] font-semibold text-[#8C928B] outline-none transition hover:border-[#DED4C6] focus:border-[#E56B52] focus:bg-[#FFF9F5]" /></label><label><span className="sr-only">Notes</span><input value={activity.notes ?? ""} onChange={(event) => updateActivity(activity.id, { notes: event.target.value })} placeholder="Add a note" className="h-8 w-full rounded-[7px] border border-transparent bg-transparent px-2 text-[10px] font-semibold text-[#8C928B] outline-none transition hover:border-[#DED4C6] focus:border-[#E56B52] focus:bg-[#FFF9F5]" /></label></div></article>)}
+    </div>
+  </section>;
 }
