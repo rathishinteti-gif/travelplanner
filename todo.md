@@ -1,9 +1,9 @@
-# Travel Planner Update Checklist
+# Travel Planner Feature Update Checklist
 
-- [x] Add live Places autocomplete and reverse geocoding through the existing map proxy.
-- [x] Extend saved places with provider IDs, formatted addresses, and coordinates.
-- [x] Add cover image and description fields to the trip model and creation modal.
-- [x] Add editable activity fields and per-day activity creation to the itinerary builder.
-- [x] Remove the old brand/profile wording and replace the headline copy.
+- [x] Add richer Places suggestion cards with photos and categories.
+- [x] Add activity deletion controls to the itinerary builder.
+- [x] Add full-day duplication with new dates and copied activities.
+- [x] Add print-ready PDF export for finalized itineraries.
+- [x] Add shareable itinerary links encoded in the URL.
 - [x] Run type checks, production build, and browser verification.
 - [ ] Save a project checkpoint and synchronize the GitHub main branch.

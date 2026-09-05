@@ -28,7 +28,7 @@ import type { LucideIcon } from "lucide-react";
 import { ItineraryBuilder } from "@/components/ItineraryBuilder";
 import { MapExplorer } from "@/components/MapExplorer";
 import { TripCreateDialog } from "@/components/TripCreateDialog";
-import { formatShortDate, readStorage, tripDays, TRIPS_STORAGE_KEY, writeStorage, type Trip } from "@/lib/travel";
+import { formatShortDate, readSharedTrip, readStorage, tripDays, TRIPS_STORAGE_KEY, writeStorage, type Trip } from "@/lib/travel";
 
 const HERO_IMAGE = "/manus-storage/travelplanner-hero_c5784f74.jpg";
 const LOGO_IMAGE = "/manus-storage/travelplanner-logo_03977460.png";
@@ -88,6 +88,15 @@ export default function Home() {
   useEffect(() => {
     if (savedTrips.length > 0 && !savedTrips.some((trip) => trip.id === activeTripId)) setActiveTripId(savedTrips[0].id);
   }, [activeTripId, savedTrips]);
+
+  useEffect(() => {
+    const sharedTrip = readSharedTrip(window.location.hash);
+    if (!sharedTrip) return;
+    setSavedTrips((current) => current.some((trip) => trip.id === sharedTrip.id) ? current : [sharedTrip, ...current]);
+    setActiveTripId(sharedTrip.id);
+    writeStorage(TRIPS_STORAGE_KEY, [sharedTrip, ...savedTrips.filter((trip) => trip.id !== sharedTrip.id)]);
+    toast("Shared itinerary loaded", { description: `${sharedTrip.destination} is ready to explore.` });
+  }, []);
 
   const activeTrip = savedTrips.find((trip) => trip.id === activeTripId) ?? null;
   const trips = savedTrips.length > 0 ? savedTrips.map((trip) => ({

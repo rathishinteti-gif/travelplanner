@@ -11,6 +11,8 @@ export type SavedPlace = {
   lng: number;
   address?: string;
   providerId?: string;
+  category?: string;
+  photoUrl?: string;
 };
 
 export type Activity = {
@@ -85,3 +87,22 @@ export function createTrip(destination: string, startDate: string, endDate: stri
 
 export const formatShortDate = (date: string) =>
   new Intl.DateTimeFormat("en", { day: "2-digit", month: "short", year: "numeric" }).format(new Date(`${date}T00:00:00`));
+
+export function createShareUrl(trip: Trip) {
+  const bytes = new TextEncoder().encode(JSON.stringify(trip));
+  let binary = "";
+  bytes.forEach((byte) => { binary += String.fromCharCode(byte); });
+  return `${window.location.origin}${window.location.pathname}#trip=${btoa(binary)}`;
+}
+
+export function readSharedTrip(hash: string): Trip | null {
+  const encoded = new URLSearchParams(hash.replace(/^#/, "")).get("trip");
+  if (!encoded) return null;
+  try {
+    const binary = atob(encoded);
+    const bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0));
+    return JSON.parse(new TextDecoder().decode(bytes)) as Trip;
+  } catch {
+    return null;
+  }
+}
