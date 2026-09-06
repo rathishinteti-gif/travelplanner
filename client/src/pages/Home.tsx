@@ -3,6 +3,8 @@
  * balancing human warmth with clear route structure and a coral wayfinding accent.
  */
 import { useEffect, useState } from "react";
+import { startLogin } from "@/const";
+import { useAuth } from "@/_core/hooks/useAuth";
 import { toast } from "sonner";
 import {
   ArrowUpRight,
@@ -25,10 +27,12 @@ import {
   UserRound,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+import { AutoPlannerDialog } from "@/components/AutoPlannerDialog";
 import { ItineraryBuilder } from "@/components/ItineraryBuilder";
 import { MapExplorer } from "@/components/MapExplorer";
 import { TripCreateDialog } from "@/components/TripCreateDialog";
-import { formatShortDate, readSharedTrip, readStorage, tripDays, TRIPS_STORAGE_KEY, writeStorage, type Trip } from "@/lib/travel";
+import { formatShortDate, parsePersistedTrip, readSharedTrip, readStorage, tripDays, TRIPS_STORAGE_KEY, writeStorage, type Trip } from "@/lib/travel";
+import { trpc } from "@/lib/trpc";
 
 const HERO_IMAGE = "/manus-storage/travelplanner-hero_c5784f74.jpg";
 const LOGO_IMAGE = "/manus-storage/travelplanner-logo_03977460.png";
@@ -79,15 +83,41 @@ function notifyComingSoon(label: string) {
   });
 }
 
+function AuthGate({ error }: { error: unknown }) {
+  return <main className="flex min-h-screen items-center justify-center bg-[#F6F2EA] px-5 py-12 text-[#1F2A35]"><section className="w-full max-w-[460px] rounded-[28px] border border-[#DDD5C8] bg-[#FBF8F2] p-8 shadow-[0_24px_70px_rgba(48,55,53,0.12)] sm:p-10"><div className="flex items-center gap-3"><span className="flex h-11 w-11 items-center justify-center rounded-[13px] bg-[#E56B52] text-white"><Compass size={20} /></span><div><p className="font-display text-[22px] leading-none">Routebook</p><p className="mt-1 text-[10px] font-bold uppercase tracking-[0.18em] text-[#8C928B]">Private travel planning</p></div></div><p className="mt-12 text-[10px] font-bold uppercase tracking-[0.2em] text-[#E56B52]">Your routes, kept together</p><h1 className="mt-3 font-display text-[44px] leading-[0.96] tracking-[-0.04em] text-[#26343B]">Plan with a little<br /><em>more certainty.</em></h1><p className="mt-5 text-[14px] leading-6 text-[#747B76]">Sign in to save trips, generate day-by-day recommendations, and keep your places and plans ready wherever you go.</p><div className="mt-8 grid gap-3 sm:grid-cols-2"><button type="button" onClick={() => startLogin()} className="flex h-12 items-center justify-center gap-2 rounded-full bg-[#E56B52] px-4 text-[13px] font-bold text-white shadow-[0_10px_24px_rgba(229,107,82,0.24)] transition hover:-translate-y-0.5 hover:bg-[#D95D45] active:scale-[0.98]">Sign in <ArrowUpRight size={16} /></button><button type="button" onClick={() => startLogin()} className="flex h-12 items-center justify-center gap-2 rounded-full border border-[#E2B8AC] bg-[#FCEBE6] px-4 text-[13px] font-bold text-[#B75A47] transition hover:bg-[#F8DDD5] active:scale-[0.98]">Create account <Plus size={16} /></button></div><p className="mt-4 text-center text-[10px] leading-4 text-[#969B94]">Your account is protected by the hosted OAuth flow. Sign in and account creation both return to your private planner.</p>{Boolean(error) && <p className="mt-4 rounded-[10px] bg-[#FCEBE6] px-3 py-2 text-[11px] font-semibold text-[#B75A47]">We couldn’t confirm your session yet. Please try again.</p>}</section></main>;
+}
+
 export default function Home() {
+  // The useAuth hook provides authentication state.
+  // To implement login/logout, call logout(), or start login from an event
+  // handler: onClick={() => startLogin()} (imported from "@/const"). Never call
+  // startLogin() during render (no href={startLogin()}) — it mints a one-time
+  // nonce cookie and must run only at the moment of navigation.
+  let { user, loading, error, isAuthenticated, logout } = useAuth();
+
   const [activeNav, setActiveNav] = useState("Overview");
   const [tripDialogOpen, setTripDialogOpen] = useState(false);
+  const [autoPlannerOpen, setAutoPlannerOpen] = useState(false);
   const [savedTrips, setSavedTrips] = useState<Trip[]>(() => readStorage(TRIPS_STORAGE_KEY, []));
   const [activeTripId, setActiveTripId] = useState<string | null>(() => readStorage<Trip[]>(TRIPS_STORAGE_KEY, [])[0]?.id ?? null);
+  const persistedTripsQuery = trpc.trips.list.useQuery(undefined, { enabled: isAuthenticated, retry: false });
+  const createTripMutation = trpc.trips.create.useMutation();
+  const updateTripMutation = trpc.trips.update.useMutation();
+  const trpcUtils = trpc.useUtils();
 
   useEffect(() => {
     if (savedTrips.length > 0 && !savedTrips.some((trip) => trip.id === activeTripId)) setActiveTripId(savedTrips[0].id);
   }, [activeTripId, savedTrips]);
+
+  useEffect(() => {
+    if (!persistedTripsQuery.data) return;
+    const remoteTrips = persistedTripsQuery.data.map(parsePersistedTrip);
+    if (remoteTrips.length > 0) {
+      setSavedTrips(remoteTrips);
+      setActiveTripId((current) => current && remoteTrips.some((trip) => trip.id === current) ? current : remoteTrips[0].id);
+      writeStorage(TRIPS_STORAGE_KEY, remoteTrips);
+    }
+  }, [persistedTripsQuery.data]);
 
   useEffect(() => {
     const sharedTrip = readSharedTrip(window.location.hash);
@@ -97,6 +127,9 @@ export default function Home() {
     writeStorage(TRIPS_STORAGE_KEY, [sharedTrip, ...savedTrips.filter((trip) => trip.id !== sharedTrip.id)]);
     toast("Shared itinerary loaded", { description: `${sharedTrip.destination} is ready to explore.` });
   }, []);
+
+  if (loading) return <main className="flex min-h-screen items-center justify-center bg-[#F6F2EA]"><div className="text-center"><div className="mx-auto h-9 w-9 animate-spin rounded-full border-2 border-[#E56B52] border-t-transparent" /><p className="mt-4 text-[11px] font-bold uppercase tracking-[0.18em] text-[#92958D]">Opening your routebook</p></div></main>;
+  if (!isAuthenticated) return <AuthGate error={error} />;
 
   const activeTrip = savedTrips.find((trip) => trip.id === activeTripId) ?? null;
   const trips = savedTrips.length > 0 ? savedTrips.map((trip) => ({
@@ -183,7 +216,7 @@ export default function Home() {
             </div>
             <div className="ml-auto flex items-center gap-4">
               <button type="button" onClick={() => notifyComingSoon("Notifications")} aria-label="Notifications" className="relative text-[#7A807D] transition hover:text-[#E56B52]"><Ticket size={18} /><span className="absolute -right-1 -top-1 h-1.5 w-1.5 rounded-full bg-[#E56B52]" /></button>
-              <div className="flex items-center gap-2 border-l border-[#DFD9CF] pl-4"><div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#D6E0D4] text-[11px] font-bold text-[#55665A]">AR</div><span className="hidden text-[12px] font-semibold text-[#65706D] sm:block">My trips</span></div>
+              <div className="flex items-center gap-2 border-l border-[#DFD9CF] pl-4"><div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#D6E0D4] text-[11px] font-bold text-[#55665A]">{(user?.name || user?.email || "TR").slice(0, 2).toUpperCase()}</div><span className="hidden max-w-[120px] truncate text-[12px] font-semibold text-[#65706D] sm:block">{user?.name || user?.email || "My trips"}</span><button type="button" onClick={() => void logout()} className="text-[10px] font-bold uppercase tracking-[0.12em] text-[#9A9E97] transition hover:text-[#E56B52]">Sign out</button></div>
             </div>
           </header>
 
@@ -231,14 +264,15 @@ export default function Home() {
             </section>
 
             <section className="mt-16 border-t border-[#E2DCD2] pt-8">
-              <div className="mb-6"><p className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.2em] text-[#92958D]"><CalendarDays size={14} className="text-[#E56B52]" /> Daily rhythm</p><h2 className="mt-2 font-display text-[31px] tracking-[-0.03em] text-[#26343B]">The route, in your handwriting.</h2></div>
-              <ItineraryBuilder trip={activeTrip} onTripChange={(nextTrip) => { const next = savedTrips.map((trip) => trip.id === nextTrip.id ? nextTrip : trip); setSavedTrips(next); writeStorage(TRIPS_STORAGE_KEY, next); }} />
+              <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between"><div><p className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.2em] text-[#92958D]"><CalendarDays size={14} className="text-[#E56B52]" /> Daily rhythm</p><h2 className="mt-2 font-display text-[31px] tracking-[-0.03em] text-[#26343B]">The route, in your handwriting.</h2></div>{activeTrip && <button type="button" onClick={() => setAutoPlannerOpen(true)} className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-[#E2B8AC] bg-[#FCEBE6] px-4 text-[11px] font-bold text-[#B75A47] transition hover:bg-[#F8DDD5]"><Sparkles size={14} /> Auto-plan this trip</button>}</div>
+              <ItineraryBuilder trip={activeTrip} onTripChange={(nextTrip) => { const next = savedTrips.map((trip) => trip.id === nextTrip.id ? nextTrip : trip); setSavedTrips(next); writeStorage(TRIPS_STORAGE_KEY, next); const id = Number(nextTrip.id); if (Number.isInteger(id) && id > 0) void updateTripMutation.mutateAsync({ id, destination: nextTrip.destination, startDate: nextTrip.startDate, endDate: nextTrip.endDate, description: nextTrip.description ?? null, coverImage: nextTrip.coverImage ?? null, itinerary: JSON.stringify(nextTrip.itinerary) }).then(() => trpcUtils.trips.list.invalidate()).catch(() => toast("Couldn’t save this edit", { description: "Your local copy is still available." })); }} />
             </section>
 
             <footer className="mt-14 flex flex-col gap-3 border-t border-[#E2DCD2] pt-5 text-[10px] font-semibold uppercase tracking-[0.15em] text-[#A0A29A] sm:flex-row sm:items-center sm:justify-between"><p>Routebook / A calmer way to go</p><p className="flex items-center gap-2"><Map size={13} /> Frontend starter workspace <span className="text-[#E56B52]">●</span></p></footer>
           </div>
         </main>
-        <TripCreateDialog open={tripDialogOpen} onOpenChange={setTripDialogOpen} onCreated={(trip) => { const next = [trip, ...savedTrips]; setSavedTrips(next); setActiveTripId(trip.id); writeStorage(TRIPS_STORAGE_KEY, next); }} />
+        <TripCreateDialog open={tripDialogOpen} onOpenChange={setTripDialogOpen} onCreated={(trip) => { const next = [trip, ...savedTrips]; setSavedTrips(next); setActiveTripId(trip.id); writeStorage(TRIPS_STORAGE_KEY, next); void createTripMutation.mutateAsync({ destination: trip.destination, startDate: trip.startDate, endDate: trip.endDate, description: trip.description ?? null, coverImage: trip.coverImage ?? null, itinerary: JSON.stringify(trip.itinerary) }).then((created) => { const persisted = { ...trip, id: String(created.id) }; setSavedTrips((current) => [persisted, ...current.filter((item) => item.id !== trip.id)]); setActiveTripId(persisted.id); writeStorage(TRIPS_STORAGE_KEY, [persisted, ...savedTrips.filter((item) => item.id !== trip.id)]); return trpcUtils.trips.list.invalidate(); }).catch(() => toast("Trip saved locally", { description: "Sign-in storage is temporarily unavailable; we’ll retry on the next save." })); }} />
+        {activeTrip && <AutoPlannerDialog open={autoPlannerOpen} onOpenChange={setAutoPlannerOpen} trip={activeTrip} onPlan={(plannedTrip) => { const next = savedTrips.map((trip) => trip.id === plannedTrip.id ? plannedTrip : trip); setSavedTrips(next); writeStorage(TRIPS_STORAGE_KEY, next); const id = Number(plannedTrip.id); if (Number.isInteger(id) && id > 0) void updateTripMutation.mutateAsync({ id, destination: plannedTrip.destination, startDate: plannedTrip.startDate, endDate: plannedTrip.endDate, description: plannedTrip.description ?? null, coverImage: plannedTrip.coverImage ?? null, itinerary: JSON.stringify(plannedTrip.itinerary) }).then(() => trpcUtils.trips.list.invalidate()).catch(() => toast("Couldn’t save the generated plan", { description: "Your local generated itinerary is still available." })); }} />}
       </div>
     </div>
   );

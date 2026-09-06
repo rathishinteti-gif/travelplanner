@@ -88,6 +88,12 @@ export function createTrip(destination: string, startDate: string, endDate: stri
 export const formatShortDate = (date: string) =>
   new Intl.DateTimeFormat("en", { day: "2-digit", month: "short", year: "numeric" }).format(new Date(`${date}T00:00:00`));
 
+export function parsePersistedTrip(row: { id: number; destination: string; startDate: string; endDate: string; description: string | null; coverImage: string | null; itinerary: string }): Trip {
+  let itinerary: ItineraryDay[] = [];
+  try { itinerary = JSON.parse(row.itinerary) as ItineraryDay[]; } catch { itinerary = []; }
+  return { id: String(row.id), destination: row.destination, startDate: row.startDate, endDate: row.endDate, description: row.description ?? "", coverImage: row.coverImage ?? "", status: itinerary.some((day) => day.activities.length) ? "ready" : "planning", pinnedPlaces: [], itinerary };
+}
+
 export function createShareUrl(trip: Trip) {
   const bytes = new TextEncoder().encode(JSON.stringify(trip));
   let binary = "";
